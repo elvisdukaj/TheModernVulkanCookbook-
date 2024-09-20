@@ -1,9 +1,14 @@
 #include <print>
 #include <vector>
 #include <algorithm>
-#include <unordered_set>
+#include <iterator>
+#include <ranges>
+#include <functional>
 
 #include <vulkan/vulkan.h>
+
+namespace ranges = std::ranges;
+namespace views = std::ranges::views;
 
 #define VK_CALL(vFun)                                                                   \
     {                                                                                   \
@@ -14,7 +19,7 @@
         }                                                                               \
     }
 
-std::vector<VkLayerProperties> enumerateLayerProperties() {
+std::vector<VkLayerProperties> enumerateInstanceLayerProperties() {
     uint32_t layersCount{0};
     vkEnumerateInstanceLayerProperties(&layersCount, nullptr);
 
@@ -24,16 +29,18 @@ std::vector<VkLayerProperties> enumerateLayerProperties() {
     return layersProperties;
 }
 
-std::vector<std::string> getAvailableLayersName() {
-    auto layerProperties = enumerateLayerProperties();
-    std::vector<std::string> availableLayers(layerProperties.size());
+std::vector<std::string> getAvailableInstanceLayersName() {
+    auto layerProperties = enumerateInstanceLayerProperties();
 
-    std::transform(begin(layerProperties), end(layerProperties), begin(availableLayers),
-                   [](const VkLayerProperties &properties) -> std::string {
-                       return std::string{properties.layerName};
-                   });
+    const auto extractNameFromProperties = [](const VkLayerProperties &properties) -> std::string {
+        return std::string{properties.layerName};
+    };
 
-    return availableLayers;
+    auto availableInstanceLayersName =
+            views::transform(layerProperties, extractNameFromProperties)
+            | ranges::to<std::vector<std::string>>();
+
+    return availableInstanceLayersName;
 }
 
 std::vector<VkExtensionProperties> enumerateExtensionsProperties() {
@@ -49,36 +56,14 @@ std::vector<VkExtensionProperties> enumerateExtensionsProperties() {
 std::vector<std::string> getLayerExtensionsName() {
     auto layerProperties = enumerateExtensionsProperties();
 
-    std::vector<std::string> layerExtensions(layerProperties.size());
-    std::transform(begin(layerProperties), end(layerProperties), begin(layerExtensions),
-                   [](const VkExtensionProperties &properties) -> std::string {
-                       return std::string{properties.extensionName};
-                   });
-
-    return layerExtensions;
-}
-
-
-std::unordered_set<std::string> filterExtensions(std::vector<std::string> availableExtensions,
-                                                 std::vector<std::string> requestedExtensions) {
-    std::sort(availableExtensions.begin(), availableExtensions.end());
-    std::sort(requestedExtensions.begin(), requestedExtensions.end());
-    std::vector<std::string> result;
-
-    std::set_intersection(
-        availableExtensions.begin(),
-        availableExtensions.end(),
-        requestedExtensions.begin(),
-        requestedExtensions.end(),
-        std::back_inserter(result));
-
-    return std::unordered_set<std::string>{
-        result.begin(), result.end()
+    auto extractExtensionName = [](const VkExtensionProperties &properties) -> std::string {
+        return std::string{properties.extensionName};
     };
+
+    return views::transform(layerProperties, extractExtensionName) | ranges::to<std::vector<std::string>>();
 }
 
 int main() {
-
     const std::vector<std::string> requestedInstanceLayers = {"VK_LAYER_KHRONOS_validation"};
 
     const std::vector<std::string> requestedInstanceExtensions = {
@@ -93,24 +78,29 @@ int main() {
 #endif
     };
 
-    const auto availableLayers = getAvailableLayersName();
+    const auto isLayerRequired = [&requestedInstanceLayers] (const std::string& name) {
+        auto it = ranges::find(requestedInstanceLayers, name);
+        const auto isIncluded = it != std::end(requestedInstanceLayers);
+        return isIncluded;
+    };
+    const auto isExtensionRequired = [&requestedInstanceExtensions] (const std::string& name) {
+        auto it = ranges::find(requestedInstanceExtensions, name);
+        const auto isIncluded = it != std::end(requestedInstanceExtensions);
+        return isIncluded;
+    };
+
+    const auto availableLayers = getAvailableInstanceLayersName();
     const auto availableExtensions = getLayerExtensionsName();
 
-    const auto enabledInstanceLayers = filterExtensions(availableLayers, requestedInstanceLayers);
-    const auto enabledInstanceExtensions = filterExtensions(availableExtensions, requestedInstanceExtensions);
+    const auto enabledInstanceLayers = availableLayers
+        | views::filter(isLayerRequired)
+        | views::transform(std::mem_fn(&std::string::c_str))
+        | ranges::to<std::vector<const char*>>();
 
-    std::vector<const char *> viewEnabledInstanceLayers(enabledInstanceLayers.size());
-    std::transform(begin(enabledInstanceLayers), end(enabledInstanceLayers), begin(viewEnabledInstanceLayers),
-                   [](const std::string &name) -> const char * {
-                       return name.c_str();
-                   });
-    std::vector<const char *> viewEnabledExtensions(enabledInstanceExtensions.size());
-    std::transform(begin(enabledInstanceExtensions), end(enabledInstanceExtensions), begin(viewEnabledExtensions),
-                   [](const std::string &name) -> const char * {
-                       return name.c_str();
-                   });
-
-    auto extensionsProperties = enumerateLayerProperties();
+    const auto enabledInstanceExtensions = availableExtensions
+        | views::filter(isExtensionRequired)
+        | views::transform(std::mem_fn(&std::string::c_str))
+        | ranges::to<std::vector<const char*>>();
 
     const VkApplicationInfo applicationInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -119,21 +109,34 @@ int main() {
         .apiVersion = VK_API_VERSION_1_3
     };
 
+    std::println("*****************");
+    std::println("Available layers:");
+    ranges::for_each(availableLayers, [](const auto& layer) { std::println(" - {}", layer); });
+
+    std::println("Available Extensions:");
+    ranges::for_each(availableExtensions, [](const auto& layer) { std::println(" - {}", layer); });
+
+    std::println("\n*****************");
+    std::println("Enabled layers:");
+    ranges::for_each(enabledInstanceLayers, [](const auto& layer) { std::println(" - {}", layer); });
+
+    std::println("Enabled Extensions:");
+    ranges::for_each(enabledInstanceExtensions, [](const auto& layer) { std::println(" - {}", layer); });
+
+
     const VkInstanceCreateInfo instanceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &applicationInfo,
-        .enabledLayerCount = static_cast<uint32_t>(viewEnabledInstanceLayers.size()),
-        .ppEnabledLayerNames = viewEnabledInstanceLayers.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(viewEnabledExtensions.size()),
-        .ppEnabledExtensionNames = viewEnabledExtensions.data()
+        .enabledLayerCount = static_cast<uint32_t>(enabledInstanceLayers.size()),
+        .ppEnabledLayerNames = enabledInstanceLayers.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size()),
+        .ppEnabledExtensionNames = enabledInstanceExtensions.data()
     };
 
     VkInstance vulkanInstance{VK_NULL_HANDLE};
     VK_CALL(vkCreateInstance(&instanceCreateInfo, nullptr, &vulkanInstance));
-    std::println("Vulkan instance created!");
-
+    
     vkDestroyInstance(vulkanInstance, nullptr);
-    std::println("Vulkan instance released");
 
     return EXIT_SUCCESS;
 }
