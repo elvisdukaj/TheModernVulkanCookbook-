@@ -18,3 +18,18 @@ function (apply_vulkan_common_properties)
         vulkan-validationlayers::vulkan-validationlayers
   )
 endfunction()
+
+function (add_vulkan_executable target_name)
+  add_executable(${target_name} ${ARGN})
+
+  target_compile_definitions(${target_name}
+      PUBLIC
+      $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+  )
+
+  target_link_libraries(${target_name}
+      PRIVATE
+      Vulkan::Loader
+      vulkan-validationlayers::vulkan-validationlayers
+  )
+endfunction()
