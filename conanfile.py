@@ -32,6 +32,7 @@ class the_vulkan_cookbookRecipe(ConanFile):
     def requirements(self):
         self.requires("vulkan-loader/1.3.239.0")
         self.requires("vulkan-validationlayers/1.3.239.0")
+        self.requires("glfw/3.4")
 
     def generate(self):
         deps = CMakeDeps(self)

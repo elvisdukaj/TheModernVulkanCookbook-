@@ -19,17 +19,29 @@ function (apply_vulkan_common_properties)
   )
 endfunction()
 
-function (add_vulkan_executable target_name)
-  add_executable(${target_name} ${ARGN})
+function (add_vulkan_executable)
+  set(options "")
+  set(oneValueArgs TARGET)
+  set(multiValueArgs SOURCES)
+  cmake_parse_arguments(ADD_VULKAN_EXECUTABLE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-  target_compile_definitions(${target_name}
-      PUBLIC
-      $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+  add_executable(${ADD_VULKAN_EXECUTABLE_TARGET})
+  target_sources(${ADD_VULKAN_EXECUTABLE_TARGET}
+      PRIVATE ${ADD_VULKAN_EXECUTABLE_SOURCES}
   )
 
-  target_link_libraries(${target_name}
+  target_compile_definitions(${ADD_VULKAN_EXECUTABLE_TARGET}
+      PUBLIC
+      # Vulkan
+      $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+      # glfw
+      $<$<PLATFORM_ID:Windows>:GLFW_EXPOSE_NATIVE_WIN32 GLFW_EXPOSE_NATIVE_WGL>
+  )
+
+  target_link_libraries(${ADD_VULKAN_EXECUTABLE_TARGET}
       PRIVATE
       Vulkan::Loader
       vulkan-validationlayers::vulkan-validationlayers
+      glfw
   )
 endfunction()
