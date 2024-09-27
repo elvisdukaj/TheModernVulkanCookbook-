@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 conan = "*"
+clang-tidy = "*"
 
 [dev-packages]
 
