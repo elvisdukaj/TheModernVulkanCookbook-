@@ -1,2 +1,3 @@
 add_subdirectory(01_initialize)
 add_subdirectory(02_create_surface)
+add_subdirectory(03_enumerate_vulkan_physical_device)
