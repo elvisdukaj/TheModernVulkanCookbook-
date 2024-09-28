@@ -14,7 +14,7 @@ namespace views = std::ranges::views;
   {                                                                                                                    \
     const auto res = vFun;                                                                                             \
     if (res != VK_SUCCESS) {                                                                                           \
-      std::println(#vFun " failed with error {}", static_cast<uint32_t>(res));                                         \
+      std::println(#vFun " failed with error {}", static_cast<int>(res));                                              \
       std::exit(res);                                                                                                  \
     }                                                                                                                  \
   }
@@ -62,12 +62,38 @@ std::vector<std::string> getLayerExtensionsName() {
   return views::transform(layerProperties, extractExtensionName) | ranges::to<std::vector<std::string>>();
 }
 
+void print(std::ranges::input_range auto&& layers) {
+  ranges::for_each(layers, [](const auto& layer) { std::println(" - {}", layer); });
+}
+
+void printVulkanInstanceAndExtensions(std::ranges::input_range auto&& availableLayers,
+                                      std::ranges::input_range auto&& availableExtensions,
+                                      std::ranges::input_range auto&& enabledLayers,
+                                      std::ranges::input_range auto&& enabledExtension) {
+  std::println("\n*****************");
+  std::println("Available Layers:");
+  print(availableLayers);
+
+  std::println("Available Extensions:");
+  print(availableExtensions);
+
+  std::println("\n*****************");
+  std::println("Enabled layers:");
+  print(enabledLayers);
+
+  std::println("Enabled Extensions:");
+  print(enabledExtension);
+}
+
 int main() {
   const std::vector<std::string> requestedInstanceLayers = {"VK_LAYER_KHRONOS_validation"};
 
   const std::vector<std::string> requestedInstanceExtensions = {
 #if defined(VK_KHR_win32_surface)
       VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+      VK_EXT_METAL_SURFACE_EXTENSION_NAME, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
 #endif
 #if defined(VK_EXT_debug_utils)
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -99,27 +125,19 @@ int main() {
                                          views::transform(std::mem_fn(&std::string::c_str)) |
                                          ranges::to<std::vector<const char*>>();
 
+  printVulkanInstanceAndExtensions(availableLayers, availableExtensions, enabledInstanceLayers,
+                                   enabledInstanceExtensions);
+
   const VkApplicationInfo applicationInfo{.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
                                           .pApplicationName = "ch01",
                                           .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
                                           .apiVersion = VK_API_VERSION_1_3};
 
-  std::println("*****************");
-  std::println("Available layers:");
-  ranges::for_each(availableLayers, [](const auto& layer) { std::println(" - {}", layer); });
-
-  std::println("Available Extensions:");
-  ranges::for_each(availableExtensions, [](const auto& layer) { std::println(" - {}", layer); });
-
-  std::println("\n*****************");
-  std::println("Enabled layers:");
-  ranges::for_each(enabledInstanceLayers, [](const auto& layer) { std::println(" - {}", layer); });
-
-  std::println("Enabled Extensions:");
-  ranges::for_each(enabledInstanceExtensions, [](const auto& layer) { std::println(" - {}", layer); });
-
   const VkInstanceCreateInfo instanceCreateInfo{
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+      .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
+#endif
       .pApplicationInfo = &applicationInfo,
       .enabledLayerCount = static_cast<uint32_t>(enabledInstanceLayers.size()),
       .ppEnabledLayerNames = enabledInstanceLayers.data(),

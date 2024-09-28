@@ -7,9 +7,10 @@
 #include <ranges>
 #include <vector>
 
+#include <vulkan/vulkan.h>
+
 #include <glfw/glfw3.h>
 #include <glfw/glfw3native.h>
-#include <vulkan/vulkan.h>
 
 namespace ranges = std::ranges;
 namespace views = std::ranges::views;
@@ -22,6 +23,9 @@ auto getRequestedInstanceExtensions() -> std::vector<std::string> {
   return std::vector<std::string>{
 #if defined(VK_KHR_win32_surface)
       VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+      VK_EXT_METAL_SURFACE_EXTENSION_NAME, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
 #endif
 #if defined(VK_EXT_debug_utils)
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -77,15 +81,17 @@ std::vector<std::string> getLayerExtensionsName() {
 }
 
 std::optional<VkSurfaceKHR> createVulkanSurface(GLFWwindow* window, VkInstance vulkanInstance) {
-  auto hwnd = glfwGetWin32Window(window);
   VkSurfaceKHR surface;
-
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+  auto hwnd = glfwGetWin32Window(window);
   const VkWin32SurfaceCreateInfoKHR surfaceInfo{.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
                                                 .hinstance = GetModuleHandleW(nullptr),
                                                 .hwnd = reinterpret_cast<HWND>(hwnd)};
 
-  auto res = vkCreateWin32SurfaceKHR(vulkanInstance, &surfaceInfo, nullptr, &surface);
-
+  const auto res = vkCreateWin32SurfaceKHR(vulkanInstance, &surfaceInfo, nullptr, &surface);
+#else
+  const auto res = glfwCreateWindowSurface(vulkanInstance, window, nullptr, &surface);
+#endif
   if (res == VK_SUCCESS)
     return surface;
   else
@@ -134,7 +140,7 @@ public:
 
   Context(const Context&) = delete;
 
-  Context(Context&& rhs) {
+  Context(Context&& rhs) noexcept {
     swap(rhs);
     rhs.m_vulkanInstance = VK_NULL_HANDLE;
     rhs.m_surface = VK_NULL_HANDLE;
@@ -165,6 +171,9 @@ private:
                                             .apiVersion = VK_API_VERSION_1_3};
 
     const VkInstanceCreateInfo instanceCreateInfo{.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+                                                  .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
+#endif
                                                   .pApplicationInfo = &applicationInfo,
                                                   .enabledLayerCount = static_cast<uint32_t>(m_layersView.size()),
                                                   .ppEnabledLayerNames = m_layersView.data(),

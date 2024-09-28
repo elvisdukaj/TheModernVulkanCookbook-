@@ -7,6 +7,10 @@ find_package(glfw3 CONFIG REQUIRED)
 
 include(cmake/common.cmake)
 
-set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
+set(WITH_CLANG_TIDY OFF)
+
+if (WITH_CLANG_TIDY)
+    set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
+endif ()
 
 add_subdirectory(ch01)

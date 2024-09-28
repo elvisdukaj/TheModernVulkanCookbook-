@@ -1,24 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(the-vulkan-cookbook CXX)
 
-function (apply_vulkan_common_properties)
-  set(options "")
-  set(oneValueArgs TARGET)
-  set(multiValueArgs "")
-  cmake_parse_arguments(APPLY_VULKAN_COMMON_PROPERTIES "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-  target_compile_definitions(${APPLY_VULKAN_COMMON_PROPERTIES_TARGET}
-      PUBLIC
-        $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
-  )
-
-  target_link_libraries(${APPLY_VULKAN_COMMON_PROPERTIES_TARGET}
-      PRIVATE
-        Vulkan::Loader
-        vulkan-validationlayers::vulkan-validationlayers
-  )
-endfunction()
-
 function (add_vulkan_executable)
   set(options "")
   set(oneValueArgs TARGET)
@@ -31,15 +13,17 @@ function (add_vulkan_executable)
   )
 
   target_compile_definitions(${ADD_VULKAN_EXECUTABLE_TARGET}
-      PUBLIC
+    PUBLIC
       # Vulkan
       $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+      $<$<PLATFORM_ID:Darwin>:VK_USE_PLATFORM_METAL_EXT>
       # glfw
       $<$<PLATFORM_ID:Windows>:GLFW_EXPOSE_NATIVE_WIN32 GLFW_EXPOSE_NATIVE_WGL>
+      $<$<PLATFORM_ID:Darwin>:GLFW_EXPOSE_NATIVE_COCOA>
   )
 
   target_link_libraries(${ADD_VULKAN_EXECUTABLE_TARGET}
-      PRIVATE
+    PRIVATE
       Vulkan::Loader
       vulkan-validationlayers::vulkan-validationlayers
       glfw
