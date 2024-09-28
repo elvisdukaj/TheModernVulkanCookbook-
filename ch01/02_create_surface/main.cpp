@@ -89,6 +89,8 @@ std::optional<VkSurfaceKHR> createVulkanSurface(GLFWwindow* window, VkInstance v
                                                 .hwnd = reinterpret_cast<HWND>(hwnd)};
 
   const auto res = vkCreateWin32SurfaceKHR(vulkanInstance, &surfaceInfo, nullptr, &surface);
+// #elif defined(VK_USE_PLATFORM_METAL_EXT)
+//   auto layer = glfwCoc
 #else
   const auto res = glfwCreateWindowSurface(vulkanInstance, window, nullptr, &surface);
 #endif
